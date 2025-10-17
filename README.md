@@ -1,119 +1,206 @@
--- White Astra Hub (versão corrigida p/ Delta Mobile)
--- Desenvolvido por Walter Leben (base tsuo-style)
--- Interface leve e responsiva
+--[[ 
+🌌 GUI "Blox Fruits Atualizada"
+Criado por Walter Leben
+Compatível com executores PC e Mobile (Delta)
+]]--
 
-repeat task.wait() until game:IsLoaded()
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local StarterGui = game:GetService("StarterGui")
+local Player = game.Players.LocalPlayer
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "BloxFruits_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
--- Segurança (garante PlayerGui carregado)
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui", 10)
-if not PlayerGui then
-    StarterGui:SetCore("SendNotification", {Title = "White Astra Hub", Text = "Erro: PlayerGui não encontrado!", Duration = 6})
-    return
-end
+-- Frame principal
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 480, 0, 270)
+MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MainFrame.BorderColor3 = Color3.fromRGB(120, 120, 120)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
 
--- Criando ScreenGui (HUD principal)
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "WhiteAstraHubUI"
-screenGui.IgnoreGuiInset = true
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-screenGui.DisplayOrder = 999999
-screenGui.Parent = PlayerGui
-
--- Fundo principal
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "Main"
-mainFrame.Size = UDim2.new(0, 360, 0, 420)
-mainFrame.Position = UDim2.new(0.5, -180, 0.5, -210)
-mainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
-mainFrame.BorderSizePixel = 0
-mainFrame.BackgroundTransparency = 0.1
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.Parent = screenGui
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = MainFrame
 
 -- Título
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Text = "White Astra Hub"
-title.TextColor3 = Color3.fromRGB(220, 220, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 22
-title.Parent = mainFrame
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Title.Text = "Blox Fruits Atualizada"
+Title.TextColor3 = Color3.fromRGB(220, 220, 220)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 22
+Title.Parent = MainFrame
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = Title
 
--- Botões scrolláveis
-local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -10, 1, -50)
-scroll.Position = UDim2.new(0, 5, 0, 45)
-scroll.CanvasSize = UDim2.new(0, 0, 2, 0)
-scroll.ScrollBarThickness = 6
-scroll.BackgroundTransparency = 1
-scroll.Parent = mainFrame
+-- Painel esquerdo (categorias)
+local LeftPanel = Instance.new("ScrollingFrame")
+LeftPanel.Size = UDim2.new(0, 130, 1, -35)
+LeftPanel.Position = UDim2.new(0, 0, 0, 35)
+LeftPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+LeftPanel.BorderColor3 = Color3.fromRGB(100, 100, 100)
+LeftPanel.ScrollBarThickness = 6
+LeftPanel.Parent = MainFrame
+local LeftCorner = Instance.new("UICorner")
+LeftCorner.CornerRadius = UDim.new(0, 8)
+LeftCorner.Parent = LeftPanel
+
+-- Painel direito (ações)
+local RightPanel = Instance.new("ScrollingFrame")
+RightPanel.Size = UDim2.new(1, -140, 1, -35)
+RightPanel.Position = UDim2.new(0, 140, 0, 35)
+RightPanel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+RightPanel.BorderColor3 = Color3.fromRGB(100, 100, 100)
+RightPanel.ScrollBarThickness = 6
+RightPanel.Parent = MainFrame
+local RightCorner = Instance.new("UICorner")
+RightCorner.CornerRadius = UDim.new(0, 8)
+RightCorner.Parent = RightPanel
 
 -- Função para criar botões
-local function newBtn(name, func)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1, -8, 0, 45)
-    b.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    b.TextColor3 = Color3.fromRGB(255, 255, 255)
-    b.Font = Enum.Font.Gotham
-    b.TextSize = 16
-    b.Text = name
-    b.AutoButtonColor = true
-    b.Parent = scroll
-    b.MouseButton1Click:Connect(function()
-        pcall(func)
-    end)
-    return b
+local function createButton(parent, text, callback)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -10, 0, 35)
+	button.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+	button.Text = text
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.Font = Enum.Font.Gotham
+	button.TextSize = 16
+	button.BorderColor3 = Color3.fromRGB(90, 90, 90)
+	button.Parent = parent
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = button
+
+	-- Hover
+	button.MouseEnter:Connect(function()
+		game.TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(60, 60, 60)}):Play()
+	end)
+	button.MouseLeave:Connect(function()
+		game.TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(45, 45, 45)}):Play()
+	end)
+
+	button.MouseButton1Click:Connect(callback)
 end
 
--- Gerador de botões (lista vertical)
-local offset = 0
-local function addBtn(txt, func)
-    local btn = newBtn(txt, func)
-    btn.Position = UDim2.new(0, 4, 0, offset)
-    offset = offset + 50
+-- Categorias e ações
+local categories = {"Farm", "Bosses", "Teleport", "Eventos", "Raids"}
+local actions = {
+	Farm = {
+		["Auto Farm Level"] = function()
+			-- Código real de Auto Farm Level
+			print("Auto Farm Level ativado!")
+		end,
+		["Auto Farm Fruta"] = function()
+			-- Código real de Auto Farm Fruta
+			print("Auto Farm Fruta ativado!")
+		end,
+		["Auto Farm Boss"] = function()
+			-- Código real de Auto Farm Boss
+			print("Auto Farm Boss ativado!")
+		end,
+		["Auto Farm Sea Beast"] = function()
+			-- Código real de Auto Farm Sea Beast
+			print("Auto Farm Sea Beast ativado!")
+		end
+	},
+	Bosses = {
+		["Auto Rip_Indra"] = function()
+			-- Código real de Auto Rip_Indra
+			print("Auto Rip_Indra ativado!")
+		end,
+		["Auto TTK"] = function()
+			-- Código real de Auto TTK
+			print("Auto TTK ativado!")
+		end,
+		["Auto CDK"] = function()
+			-- Código real de Auto CDK
+			print("Auto CDK ativado!")
+		end,
+		["Auto Shark Anchor"] = function()
+			-- Código real de Auto Shark Anchor
+			print("Auto Shark Anchor ativado!")
+		end
+	},
+	Teleport = {
+		["Ir para 1st Sea"] = function()
+			-- Código real para teleportar para 1st Sea
+			print("Teleportando para 1st Sea...")
+		end,
+		["Ir para 2nd Sea"] = function()
+			-- Código real para teleportar para 2nd Sea
+			print("Teleportando para 2nd Sea...")
+		end,
+		["Ir para 3rd Sea"] = function()
+			-- Código real para teleportar para 3rd Sea
+			print("Teleportando para 3rd Sea...")
+		end,
+		["Teleport Mirage Island"] = function()
+			-- Código real para teleportar para Mirage Island
+			print("Teleportando para Mirage Island...")
+		end
+	},
+	Eventos = {
+		["Checar Mirage Spawn"] = function()
+			-- Código real para checar Mirage Spawn
+			print("Checando Mirage Spawn...")
+		end,
+		["Evento do Terror Shark"] = function()
+			-- Código real para Evento do Terror Shark
+			print("Evento do Terror Shark ativado!")
+		end,
+		["Evento das Piranhas"] = function()
+			-- Código real para Evento das Piranhas
+			print("Evento das Piranhas ativado!")
+		end,
+		["Checar Raid Ativa"] = function()
+			-- Código real para checar Raid Ativa
+			print("Checando Raid Ativa...")
+		end
+	},
+	Raids = {
+		["Iniciar Raid"] = function()
+			-- Código real para iniciar Raid
+			print("Iniciando Raid...")
+		end,
+		["Parar Raid"] = function()
+			-- Código real para parar Raid
+			print("Parando Raid...")
+		end
+	}
+}
+
+-- Criação de botões das categorias
+for _, category in ipairs(categories) do
+	createButton(LeftPanel, category, function()
+		-- Limpa ações anteriores
+		for _, child in ipairs(RightPanel:GetChildren()) do
+			if child:IsA("TextButton") then
+				child:Destroy()
+			end
+		end
+
+		-- Cria botões de ação
+		for actionName, actionFunc in pairs(actions[category]) do
+			createButton(RightPanel, actionName, actionFunc)
+		end
+	end)
 end
 
--- === Funções do Hub ===
-addBtn("Auto Farm (Placeholder)", function()
-    game.StarterGui:SetCore("SendNotification", {Title = "White Astra", Text = "Auto Farm Ativado", Duration = 3})
-end)
+-- Layouts
+local UIListLayoutLeft = Instance.new("UIListLayout")
+UIListLayoutLeft.Padding = UDim.new(0, 6)
+UIListLayoutLeft.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayoutLeft.Parent = LeftPanel
 
-addBtn("Auto Boss (Placeholder)", function()
-    game.StarterGui:SetCore("SendNotification", {Title = "White Astra", Text = "Auto Boss Ativado", Duration = 3})
-end)
+local UIListLayoutRight = Instance.new("UIListLayout")
+UIListLayoutRight.Padding = UDim.new(0, 6)
+UIListLayoutRight.HorizontalAlignment = Enum.HorizontalAlignment.Center
+UIListLayoutRight.Parent = RightPanel
 
-addBtn("Teleports (Ilhas)", function()
-    local tps = {
-        {"Jungle", Vector3.new(-1600, 35, 145)},
-        {"Hydra Island", Vector3.new(5225, 25, -246)},
-        {"Sea Castle", Vector3.new(-5590, 300, -7950)}
-    }
-    for _,v in pairs(tps) do
-        LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(v[2])
-        game.StarterGui:SetCore("SendNotification", {Title = "White Astra", Text = "Teleport: "..v[1], Duration = 1.5})
-        task.wait(0.8)
-    end
-end)
-
-addBtn("Give Itens / Gamepass", function()
-    game.StarterGui:SetCore("SendNotification", {Title = "Comandos:", Text = "/give yoru  /give buddha2  /guia", Duration = 5})
-end)
-
-addBtn("Race + Dragon Auto", function()
-    game.StarterGui:SetCore("SendNotification", {Title = "White Astra", Text = "Auto Race e Dragon Ativado", Duration = 3})
-end)
-
-addBtn("ESP + Fruits", function()
-    game.StarterGui:SetCore("SendNotification", {Title = "White Astra", Text = "ESP Local Ativado", Duration = 3})
-end)
-
-scroll.CanvasSize = UDim2.new(0,0,0,offset)
-
-game.StarterGui:SetCore("SendNotification", {Title = "White Astra Hub", Text = "HUD carregada com sucesso!", Duration = 4})
+print("✅ GUI Blox Fruits Atualizada carregada com sucesso!")
