@@ -1,481 +1,312 @@
---[[
- Dev Hub Warpo
+-- White Astra Hub (compact) - estilo tsuo, otimizado para mobile (Delta)
+-- Estrutura pronta: UI minimalista + utilitários leves + placeholders para funções do jogo
+-- COLE DIRETO NO DELTA / ARCEUS X / HYDROGEN (sem loadstring)
 
-  -------------------------------------------------------------
-  BLOCO DESCONSIDERADOR (mantenha no topo para identificar "não mexer").
-  Defina DESCONSIDERAR = false para que o Hub execute.
---]]
-
-local DESCONSIDERAR = false -- mude para false para executar; true interrompe o script
-
-pcall(function()
-    if DESCONSIDERAR then
-        warn("[script_desconsiderador] ATIVADO: Dev Hub está desconsiderado. Mude DESCONSIDERAR = false para reativar.")
-    else
-        print("[script_desconsiderador] Dev Hub ativado.")
-    end
-end)
-
-if DESCONSIDERAR then return end
--- === FIM DO BLOCO DESCONSIDERADOR ===
-
-
--- Dev Hub LocalScript
--- Mobile-friendly Admin / Dev Hub UI
--- Uso: coloque em StarterPlayerScripts. Somente roda no cliente do jogador.
-
+-- Config
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
 local StarterGui = game:GetService("StarterGui")
-local player = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
 
--- === AUTHORIZADOS (nomes) - ajuste conforme quiser ===
-local ALLOWED_PLAYERS = {
-    ["LivingBloodFlame"] = true,
-    ["pppoknovo"] = true,
-    ["lucasgamespok"] = true,
-}
+-- Global toggles
+local _G = _G or {}
+_G.AutoFarm = false
+_G.AutoBoss = false
+_G.AutoSeaEvents = false
+_G.ESPEnabled = false
+_G.RealFruitESP = false
 
-if not (ALLOWED_PLAYERS[player.Name] or RunService:IsStudio()) then
-    -- Se não autorizado (e não estiver no Studio), não mostra a GUI
-    warn("[DevHub] jogador não autorizado: "..player.Name)
-    return
-end
-
--- === utilidades de criação UI ===
-local function create(inst, props, children)
-    local o = Instance.new(inst)
-    if props then
-        for k,v in pairs(props) do
-            pcall(function() o[k] = v end)
-        end
-    end
-    if children then
-        for _,c in ipairs(children) do c.Parent = o end
-    end
-    return o
-end
-
--- === ScreenGui base ===
-local screen = create("ScreenGui", {
-    Name = "DevHubGUI",
-    ResetOnSpawn = false,
-    ZIndexBehavior = Enum.ZIndexBehavior.Global,
-})
-screen.Parent = player:WaitForChild("PlayerGui")
-
--- Auto-scale para mobile
-local scaler = create("UIScale", { Scale = 1 })
-scaler.Parent = screen
-local function autoScale()
-    local size = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1080,1920)
-    local minSide = math.min(size.X, size.Y)
-    scaler.Scale = math.clamp(minSide/1080, 0.7, 1.2)
-end
-autoScale()
-workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(autoScale)
-UserInputService:GetPropertyChangedSignal("TouchEnabled"):Connect(autoScale)
-
--- === painel principal ===
-local panel = create("Frame", {
-    Name = "Panel",
-    Size = UDim2.fromOffset(420, 520),
-    Position = UDim2.new(0, 18, 0, 80),
-    BackgroundColor3 = Color3.fromRGB(20, 22, 26),
-    BorderSizePixel = 0,
-})
-create("UICorner", { CornerRadius = UDim.new(0,14) }).Parent = panel
-create("UIStroke", { Color = Color3.fromRGB(50,55,64), Thickness = 1 }).Parent = panel
-panel.Parent = screen
-
--- header
-local header = create("Frame", {
-    Size = UDim2.new(1, 0, 0, 44),
-    BackgroundTransparency = 0,
-    BackgroundColor3 = Color3.fromRGB(28,30,36),
-})
-header.Parent = panel
-create("UICorner", { CornerRadius = UDim.new(0,14) }).Parent = header
-
-local title = create("TextLabel", {
-    Text = "DevHub — Tools · Main · Farm · ESP",
-    TextColor3 = Color3.fromRGB(230,234,240),
-    BackgroundTransparency = 1,
-    Font = Enum.Font.GothamBold,
-    TextSize = 18,
-    Size = UDim2.new(1, -80, 1, 0),
-    TextXAlignment = Enum.TextXAlignment.Left,
-    Position = UDim2.new(0, 12, 0, 0),
-})
-title.Parent = header
-
-local closeBtn = create("TextButton", {
-    Text = "✕",
-    Size = UDim2.fromOffset(36, 36),
-    Position = UDim2.new(1, -44, 0, 4),
-    BackgroundTransparency = 1,
-    Font = Enum.Font.GothamBold,
-    TextSize = 20,
-    TextColor3 = Color3.fromRGB(200,200,200),
-})
-closeBtn.Parent = header
-
-local collapse = false
-closeBtn.Activated:Connect(function()
-    collapse = not collapse
-    panel.Size = collapse and UDim2.fromOffset(220, 44) or UDim2.fromOffset(420, 520)
-    header.Visible = true
-end)
-
--- draggable behavior (touch + mouse)
-do
-    local dragging, dragStart, startPos
-    panel.InputBegan:Connect(function(inp)
-        if inp.UserInputType == Enum.UserInputType.Touch or inp.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = Vector2.new(inp.Position.X, inp.Position.Y)
-            startPos = panel.AbsolutePosition
-            inp.Changed:Connect(function()
-                if inp.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
+-- Utilitários leves
+local function notify(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {Title = title or "White Astra"; Text = text or ""; Duration = duration or 4})
     end)
-    panel.InputChanged:Connect(function(inp)
-        if dragging and (inp.UserInputType == Enum.UserInputType.Touch or inp.UserInputType == Enum.UserInputType.MouseMovement) then
-            local delta = Vector2.new(inp.Position.X, inp.Position.Y) - dragStart
-            local newX = math.clamp(startPos.X + delta.X, 0, workspace.CurrentCamera.ViewportSize.X - panel.AbsoluteSize.X)
-            local newY = math.clamp(startPos.Y + delta.Y, 0, workspace.CurrentCamera.ViewportSize.Y - panel.AbsoluteSize.Y)
-            panel.Position = UDim2.fromOffset(newX, newY)
+end
+
+local function safeTP(pos)
+    pcall(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(pos)
         end
     end)
 end
 
--- content area
-local content = create("Frame", {
-    Size = UDim2.new(1, -24, 1, -64),
-    Position = UDim2.new(0, 12, 0, 52),
-    BackgroundTransparency = 1,
-})
-content.Parent = panel
+local function round(n) return math.floor(tonumber(n) + 0.5) end
 
--- tabs
-local tabsFrame = create("Frame", { Size = UDim2.new(1, 0, 0, 40), BackgroundTransparency = 1 })
-tabsFrame.Parent = content
+-- Minimal mobile UI (single-screen, touch-friendly)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "WhiteAstraHubUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local tabNames = {"Main", "Tools", "Farm", "ESP", "Settings"}
-local tabButtons = {}
-local activeTab = "Main"
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Name = "Main"
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Size = UDim2.new(0, 360, 0, 420)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.BackgroundTransparency = 0.12
+mainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Visible = true
+mainFrame.Active = true
 
-local function createTabButton(name, idx)
-    local b = create("TextButton", {
-        Text = name,
-        Size = UDim2.fromOffset(76, 32),
-        Position = UDim2.new(0, 8 + (idx-1) * 84, 0, 0),
-        BackgroundColor3 = Color3.fromRGB(36, 40, 48),
-        AutoButtonColor = true,
-        Font = Enum.Font.GothamSemibold,
-        TextSize = 14,
-        TextColor3 = Color3.fromRGB(210,210,210),
-    })
-    create("UICorner", { CornerRadius = UDim.new(0,8) }).Parent = b
-    b.Parent = tabsFrame
-    return b
-end
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "White Astra Hub"
+title.TextColor3 = Color3.fromRGB(200, 200, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
 
-for i,name in ipairs(tabNames) do
-    local btn = createTabButton(name, i)
-    tabButtons[name] = btn
-end
+local btnContainer = Instance.new("ScrollingFrame", mainFrame)
+btnContainer.Size = UDim2.new(1, -16, 1, -56)
+btnContainer.Position = UDim2.new(0, 8, 0, 48)
+btnContainer.BackgroundTransparency = 1
+btnContainer.CanvasSize = UDim2.new(0, 0, 2, 0)
+btnContainer.ScrollBarThickness = 6
 
--- pages container
-local pages = create("Frame", { Size = UDim2.new(1,0,1,-56), Position = UDim2.new(0,0,0,44), BackgroundTransparency = 1 })
-pages.Parent = content
-
-local pageFrames = {}
-for _,name in ipairs(tabNames) do
-    local pf = create("ScrollingFrame", {
-        Name = name .. "Page",
-        Size = UDim2.new(1, -12, 1, 0),
-        Position = UDim2.new(0, 6, 0, 0),
-        BackgroundTransparency = 1,
-        CanvasSize = UDim2.new(0, 0, 0, 0),
-        ScrollBarThickness = 6
-    })
-    create("UIListLayout", { Padding = UDim.new(0,8), SortOrder = Enum.SortOrder.LayoutOrder }).Parent = pf
-    pf.Parent = pages
-    pageFrames[name] = pf
-end
-
-local function setActiveTab(name)
-    activeTab = name
-    for n,btn in pairs(tabButtons) do
-        btn.BackgroundColor3 = (n == name) and Color3.fromRGB(50,130,200) or Color3.fromRGB(36,40,48)
-    end
-    for n,frame in pairs(pageFrames) do
-        frame.Visible = (n == name)
-    end
-end
-setActiveTab("Main")
-
-for name,btn in pairs(tabButtons) do
-    btn.Activated:Connect(function() setActiveTab(name) end)
-end
-
--- helper: create a large control button
-local function makeBigButton(parent, txt, hint)
-    local btn = create("TextButton", {
-        Size = UDim2.new(1, -24, 0, 56),
-        BackgroundColor3 = Color3.fromRGB(42,46,56),
-        Font = Enum.Font.GothamBold,
-        TextSize = 18,
-        Text = txt,
-        TextColor3 = Color3.fromRGB(240,240,240),
-    })
-    create("UICorner", { CornerRadius = UDim.new(0,10) }).Parent = btn
-    local lbl = create("TextLabel", {
-        Text = hint or "",
-        BackgroundTransparency = 1,
-        Font = Enum.Font.Gotham,
-        TextSize = 12,
-        TextColor3 = Color3.fromRGB(180,180,180),
-        Position = UDim2.new(0, 12, 1, -18),
-        Size = UDim2.new(1, -24, 0, 16),
-    })
-    lbl.Parent = btn
-    btn.Parent = parent
+local function makeButton(parent, y, text)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(1, -8, 0, 44)
+    btn.Position = UDim2.new(0, 4, 0, y)
+    btn.BackgroundTransparency = 0.15
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    btn.BorderSizePixel = 0
+    btn.TextColor3 = Color3.fromRGB(230, 230, 255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 16
+    btn.Text = text
+    btn.AutoButtonColor = true
     return btn
 end
 
--- =========================
--- MAIN TAB (quick actions)
--- =========================
-local mainPage = pageFrames["Main"]
-makeBigButton(mainPage, "Open Dev Console", "Abre um pequeno console para comandos rápidos").Activated:Connect(function()
-    -- minimal console: show a prompt in Output and on-screen
-    StarterGui:SetCore("SendNotification", {
-        Title = "Dev Console",
-        Text = "Console aberto (veja Output). Comandos: spawnNPC, clearNPCs, toggleESP",
-        Duration = 6
-    })
-    print("[DevHub] Quick console: spawnNPC | clearNPCs | toggleESP")
+-- Buttons / Toggles
+local y = 4
+local btnAutoFarm = makeButton(btnContainer, y, "Auto Farm (placeholder)")
+y = y + 52
+local btnAutoBoss = makeButton(btnContainer, y, "Auto Boss (placeholder)")
+y = y + 52
+local btnSeaEvents = makeButton(btnContainer, y, "Auto Sea Events (placeholder)")
+y = y + 52
+local btnRaceAuto = makeButton(btnContainer, y, "Auto Race V1-V4 + Dragon (placeholder)")
+y = y + 52
+local btnTeleportMenu = makeButton(btnContainer, y, "Teleports (menu)")
+y = y + 52
+local btnGiveMenu = makeButton(btnContainer, y, "Give: Yoru / Buddha2")
+y = y + 52
+local btnESP = makeButton(btnContainer, y, "Toggle ESP (players/chests)")
+y = y + 52
+local btnFruitESP = makeButton(btnContainer, y, "Toggle Fruit ESP")
+y = y + 52
+local speedLabel = Instance.new("TextLabel", btnContainer)
+speedLabel.Size = UDim2.new(1, -8, 0, 26)
+speedLabel.Position = UDim2.new(0, 4, 0, y)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.fromRGB(200,200,255)
+speedLabel.Text = "WalkSpeed: 16"
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextSize = 14
+y = y + 34
+
+local speedSlider = Instance.new("Frame", btnContainer)
+speedSlider.Size = UDim2.new(1, -8, 0, 28)
+speedSlider.Position = UDim2.new(0, 4, 0, y)
+speedSlider.BackgroundTransparency = 0.15
+speedSlider.BackgroundColor3 = Color3.fromRGB(24,24,32)
+local sliderFill = Instance.new("Frame", speedSlider)
+sliderFill.Size = UDim2.new(0, 120, 1, 0)
+sliderFill.Position = UDim2.new(0, 0, 0, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(120,160,255)
+local dragging = false
+y = y + 44
+
+btnContainer.CanvasSize = UDim2.new(0, 0, 0, y)
+
+-- Slider behavior (touch-friendly)
+local function setSpeedFromX(x)
+    local rel = math.clamp(x / speedSlider.AbsoluteSize.X, 0, 1)
+    local minS, maxS = 16, 200
+    local val = math.floor(minS + (maxS - minS) * rel + 0.5)
+    sliderFill.Size = UDim2.new(rel, 0, 1, 0)
+    speedLabel.Text = "WalkSpeed: " .. tostring(val)
+    pcall(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = val
+        end
+    end)
+end
+
+speedSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        setSpeedFromX(input.Position.X - speedSlider.AbsolutePosition.X)
+    end
+end)
+speedSlider.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+        setSpeedFromX(input.Position.X - speedSlider.AbsolutePosition.X)
+    end
+end)
+speedSlider.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
 end)
 
-local btnSpawnTestNPC = makeBigButton(mainPage, "Spawn Test NPC", "Cria um NPC simples para testes (somente cliente)").Activated:Connect(function()
-    -- cria um NPC simples local (não replicado ao servidor) para layout/prototipagem visual
-    local model = Instance.new("Model")
-    model.Name = "Dev_NPC_" .. tostring(math.random(1000,9999))
-    local root = Instance.new("Part")
-    root.Size = Vector3.new(2,2,1)
-    root.Anchored = false
-    root.CanCollide = false
-    root.Position = (player.Character and player.Character.PrimaryPart and player.Character.PrimaryPart.Position or workspace.CurrentCamera.CFrame.Position) + Vector3.new(0,0,-8)
-    root.Parent = model
-    local hum = Instance.new("Humanoid")
-    hum.Parent = model
-    model.Parent = workspace
-    -- keep local registry
-    local registry = screen:FindFirstChild("__Dev_NPCs") or Instance.new("Folder", screen)
-    registry.Name = "__Dev_NPCs"
-    model.Parent = workspace
-    -- create a little billboard for the NPC (debug)
-    local bill = Instance.new("BillboardGui", root)
-    bill.Size = UDim2.new(0,160,0,40)
-    bill.StudsOffset = Vector3.new(0,2.4,0)
+-- Simple Teleports menu (compact)
+local teleports = {
+    {"First Sea - Jungle", Vector3.new(-1600,35,145)},
+    {"Second Sea - Hydra Island", Vector3.new(5225,25,-246)},
+    {"Third Sea - Sea Castle", Vector3.new(-5590,300,-7950)}
+}
+
+btnTeleportMenu.MouseButton1Click:Connect(function()
+    for i, t in ipairs(teleports) do
+        safeTP(t[2])
+        notify("Teleporting to "..t[1], "", 2)
+        wait(0.5)
+    end
+end)
+
+-- Give menu (chat-based helper)
+btnGiveMenu.MouseButton1Click:Connect(function()
+    notify("/give yoru  or  /give buddha2  -> type in chat", "", 4)
+end)
+
+-- Simple ESP implementation (client-side only)
+local espFolder = Instance.new("Folder")
+espFolder.Name = "WhiteAstra_ESPs"
+espFolder.Parent = Workspace
+
+local function clearESP()
+    for _,v in pairs(espFolder:GetChildren()) do pcall(function() v:Destroy() end) end
+end
+
+local function createBillboard(parent, text, color)
+    local bill = Instance.new("BillboardGui")
+    bill.Adornee = parent
     bill.AlwaysOnTop = true
-    local label = Instance.new("TextLabel", bill)
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(1,0,1,0)
-    label.Font = Enum.Font.GothamBold
-    label.Text = "Dev NPC"
-    label.TextSize = 16
-    -- mark cleanup
-    game:GetService("Debris"):AddItem(model, 60) -- autodestrói em 60s
-end)
+    bill.Size = UDim2.new(0, 140, 0, 40)
+    local lbl = Instance.new("TextLabel", bill)
+    lbl.Size = UDim2.new(1,0,1,0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextSize = 14
+    lbl.TextColor3 = color or Color3.new(1,1,1)
+    lbl.Font = Enum.Font.Gotham
+    bill.Parent = espFolder
+    return bill
+end
 
-local btnClearLocal = makeBigButton(mainPage, "Clear Local Dev Objects", "Remove objetos criados pelo hub").Activated:Connect(function()
-    -- tenta limpar os Dev NPCs que criamos (procura por nomes que começam com Dev_)
-    for _,v in pairs(workspace:GetChildren()) do
-        if tostring(v.Name):match("^Dev_") then
-            pcall(function() v:Destroy() end)
+local function updateESP()
+    clearESP()
+    if not _G.ESPEnabled then return end
+    for _,pl in pairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("Head") then
+            createBillboard(pl.Character.Head, pl.Name .. " | " .. round((LocalPlayer.Character.Head.Position - pl.Character.Head.Position).Magnitude/3) .. "m", Color3.fromRGB(255,200,200))
         end
     end
-    StarterGui:SetCore("SendNotification", {Title="DevHub", Text="Limpeza executada", Duration=3})
+    for _,obj in pairs(Workspace:GetChildren()) do
+        if string.find(obj.Name, "Chest") then
+            createBillboard(obj, obj.Name, Color3.fromRGB(255,215,120))
+        end
+    end
+end
+
+-- Fruit ESP (simple)
+local function updateFruitESP()
+    if not _G.RealFruitESP then return end
+    for _,v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("Tool") and (string.find(v.Name:lower(), "fruit") or string.find(v.Name:lower(), "devil")) and v:FindFirstChild("Handle") then
+            createBillboard(v.Handle, v.Name, Color3.fromRGB(180,255,180))
+        end
+    end
+end
+
+-- Toggle handlers
+btnESP.MouseButton1Click:Connect(function()
+    _G.ESPEnabled = not _G.ESPEnabled
+    if _G.ESPEnabled then
+        notify("ESP ativado", "", 2)
+    else
+        clearESP()
+        notify("ESP desativado", "", 2)
+    end
 end)
 
--- =========================
--- TOOLS TAB
--- =========================
-local toolsPage = pageFrames["Tools"]
-
-local btnGiveTestTool = makeBigButton(toolsPage, "Give Test Sword (local)", "Adiciona uma ferramenta local de teste ao backpack")
-btnGiveTestTool.Activated:Connect(function()
-    local tool = Instance.new("Tool")
-    tool.Name = "DevSword"
-    tool.RequiresHandle = true
-    local handle = Instance.new("Part")
-    handle.Name = "Handle"
-    handle.Size = Vector3.new(1,4,0.5)
-    handle.BrickColor = BrickColor.new("Really red")
-    handle.Parent = tool
-    tool.Parent = player:FindFirstChild("Backpack") or player:WaitForChild("Backpack")
-    StarterGui:SetCore("SendNotification", {Title="DevHub", Text="DevSword adicionada ao Backpack", Duration=2})
+btnFruitESP.MouseButton1Click:Connect(function()
+    _G.RealFruitESP = not _G.RealFruitESP
+    if _G.RealFruitESP then notify("Fruit ESP ativado", "", 2) else notify("Fruit ESP desativado", "", 2) end
 end)
 
-local btnGiveTool2 = makeBigButton(toolsPage, "Spawn Test Platform", "Cria uma plataforma para testes de física")
-btnGiveTool2.Activated:Connect(function()
-    local p = Instance.new("Part")
-    p.Size = Vector3.new(12,1,12)
-    p.Anchored = true
-    p.CFrame = (player.Character and player.Character.PrimaryPart and player.Character.PrimaryPart.CFrame or workspace.CurrentCamera.CFrame) * CFrame.new(0, -6, -10)
-    p.BrickColor = BrickColor.new("Really black")
-    p.Parent = workspace
-    game:GetService("Debris"):AddItem(p, 120)
-    StarterGui:SetCore("SendNotification", {Title="DevHub", Text="Plataforma criada", Duration=2})
-end)
-
--- =========================
--- FARM TAB (simulação segura)
--- =========================
-local farmPage = pageFrames["Farm"]
-
-local autoFarmEnabled = false
-local farmLoopConn
-
-local btnToggleAutoFarm = makeBigButton(farmPage, "Toggle Auto-Farm (simulate)", "Faz spawn local de alvos e 'coleta' automaticamente (apenas dev)")
-btnToggleAutoFarm.Activated:Connect(function()
-    autoFarmEnabled = not autoFarmEnabled
-    StarterGui:SetCore("SendNotification", {Title="DevHub", Text="Auto-Farm "..tostring(autoFarmEnabled), Duration=2})
-    if autoFarmEnabled then
-        farmLoopConn = RunService.Heartbeat:Connect(function()
-            -- checa se existe um alvo local; se não, cria e "coleta"
-            local existing = workspace:FindFirstChild("DevFarmTarget")
-            if not existing then
-                local t = Instance.new("Part")
-                t.Name = "DevFarmTarget"
-                t.Size = Vector3.new(1.5,1.5,1.5)
-                t.Anchored = false
-                t.CFrame = (player.Character and player.Character.PrimaryPart and player.Character.PrimaryPart.CFrame or workspace.CurrentCamera.CFrame) * CFrame.new(0,0,-15)
-                t.Parent = workspace
-                task.delay(15, function() pcall(function() if t and t.Parent then t:Destroy() end end) end)
-            else
-                -- checa distância, simula coleta local
-                local hrp = player.Character and player.Character.PrimaryPart
-                if hrp and (hrp.Position - existing.Position).Magnitude < 6 then
-                    -- "coleta"
-                    pcall(function() existing:Destroy() end)
-                    StarterGui:SetCore("SendNotification", {Title="DevHub", Text="Target coletado (simulado)", Duration=1})
-                else
-                    -- mover jogador próximo (somente visual: cria um tween para A região)
-                end
+-- Placeholders for automated features (NO direct remote calls included)
+btnAutoFarm.MouseButton1Click:Connect(function()
+    _G.AutoFarm = not _G.AutoFarm
+    if _G.AutoFarm then
+        notify("AutoFarm placeholder ON", "", 2)
+        spawn(function()
+            while _G.AutoFarm do
+                -- TODO: Implement auto-farm loop here (safe, optimized)
+                -- Example minimal structure:
+                -- 1) find nearest valid mob
+                -- 2) teleport near it (safeTP) OR pathfind locally
+                -- 3) trigger local attacks (player-controlled tools) if available
+                -- WARNING: Do not include server-invoking exploitation here unless you understand anti-cheat risks.
+                wait(1)
             end
         end)
     else
-        if farmLoopConn then farmLoopConn:Disconnect(); farmLoopConn = nil end
+        notify("AutoFarm placeholder OFF", "", 2)
     end
 end)
 
--- =========================
--- ESP TAB (client-only debug ESP)
--- =========================
-local espPage = pageFrames["ESP"]
+btnAutoBoss.MouseButton1Click:Connect(function()
+    _G.AutoBoss = not _G.AutoBoss
+    notify("AutoBoss placeholder: " .. tostring(_G.AutoBoss), "", 2)
+end)
 
-local espEnabled = false
-local espFolder = Instance.new("Folder", screen)
-espFolder.Name = "__Dev_ESP"
+btnSeaEvents.MouseButton1Click:Connect(function()
+    _G.AutoSeaEvents = not _G.AutoSeaEvents
+    notify("Auto Sea Events placeholder: " .. tostring(_G.AutoSeaEvents), "", 2)
+end)
 
-local function createESPFor(instance)
-    if not instance or not instance:IsA("Model") then return end
-    local hrp = instance:FindFirstChild("HumanoidRootPart") or instance:FindFirstChild("Head") or instance.PrimaryPart
-    if not hrp then return end
-    local key = "ESP_"..instance:GetDebugId()
-    if espFolder:FindFirstChild(key) then return end
-    local gui = Instance.new("BillboardGui")
-    gui.Name = key
-    gui.AlwaysOnTop = true
-    gui.ExtentsOffset = Vector3.new(0,2.2,0)
-    gui.Size = UDim2.new(0,180,0,36)
-    gui.Adornee = hrp
-    gui.Parent = espFolder
-    local label = Instance.new("TextLabel", gui)
-    label.Size = UDim2.new(1,0,1,0)
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 16
-    label.TextColor3 = Color3.fromRGB(7,236,240)
-    label.Text = instance.Name
-end
-
-local function refreshESP()
-    -- remove antigos
-    for _,v in ipairs(espFolder:GetChildren()) do v:Destroy() end
-    for _,m in ipairs(workspace:GetChildren()) do
-        if m:IsA("Model") and m:FindFirstChildOfClass("Humanoid") then
-            createESPFor(m)
+btnRaceAuto.MouseButton1Click:Connect(function()
+    notify("Auto Race/Dragon placeholder activated", "", 2)
+    -- Example: attempt local equip/activation if player has transformation tool in Backpack (client-only)
+    spawn(function()
+        if LocalPlayer.Backpack then
+            for _,t in pairs(LocalPlayer.Backpack:GetChildren()) do
+                if string.find(t.Name:lower(), "dragon") or string.find(t.Name:lower(), "transformation") then
+                    pcall(function()
+                        LocalPlayer.Character.Humanoid:EquipTool(t)
+                        if t and t.Parent and t:FindFirstChild("Activate") == nil then
+                            -- Some tools use Activate() method; others rely on remote events (not included)
+                            if type(t.Activate) == "function" then
+                                t:Activate()
+                                notify("Tentativa de ativar transformação (local)", "", 2)
+                            end
+                        end
+                    end)
+                end
+            end
         end
-    end
-end
-
-local btnToggleESP = makeBigButton(espPage, "Toggle Debug ESP (client-only)", "Mostra labels sobre NPCs locais")
-btnToggleESP.Activated:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        refreshESP()
-        StarterGui:SetCore("SendNotification", {Title="DevHub", Text="ESP ligado", Duration=2})
-    else
-        for _,v in ipairs(espFolder:GetChildren()) do v:Destroy() end
-        StarterGui:SetCore("SendNotification", {Title="DevHub", Text="ESP desligado", Duration=2})
-    end
+    end)
 end)
 
--- opcional: atualizar ESP periodicamente
-local espUpdateConn
-espUpdateConn = RunService.Heartbeat:Connect(function()
-    if espEnabled then
-        -- mantém a lista relativamente atualizada (leve)
-        if math.random() < 0.02 then
-            refreshESP()
-        end
-    end
-end)
-
--- =========================
--- SETTINGS TAB
--- =========================
-local settingsPage = pageFrames["Settings"]
-local cbShowOnJoin = create("TextButton", {
-    Text = "Toggle Show On Join (persist not implemented)",
-    Size = UDim2.new(1, -24, 0, 52),
-    BackgroundColor3 = Color3.fromRGB(46,50,56),
-    Font = Enum.Font.Gotham,
-    TextSize = 14,
-})
-create("UICorner", {CornerRadius = UDim.new(0,10)}).Parent = cbShowOnJoin
-cbShowOnJoin.Parent = settingsPage
-cbShowOnJoin.Activated:Connect(function()
-    StarterGui:SetCore("SendNotification", {Title="DevHub", Text="Opção fictícia alternada (apenas dev)", Duration=3})
-end)
-
--- =========================
--- Visual polish: ensure pages' canvas sizes adapt
--- =========================
-for _,pf in pairs(pageFrames) do
-    local layout = pf:FindFirstChildOfClass("UIListLayout")
-    if layout then
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            pf.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
+-- Basic update loop (low-frequency to be mobile-friendly)
+spawn(function()
+    while true do
+        pcall(function()
+            updateESP()
+            updateFruitESP()
         end)
+        wait(1.2)
     end
-end
+end)
 
--- quick hint
-StarterGui:SetCore("SendNotification", {
-    Title = "DevHub",
-    Text = "DevHub pronto — use as abas para testar objetos, tools e ESP (somente para dev).",
-    Duration = 5
-})
-
--- final
-print("[DevHub] Local hub rodando para: "..player.Name)
+-- Small helper: show commands guide via notification
+notify("White Astra Hub carregado (tsuo-style). Use buttons.", "Delta-friendly", 4)
