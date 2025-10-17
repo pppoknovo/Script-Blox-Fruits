@@ -1,6 +1,6 @@
 --[[
-  script_desconsiderador + Dev Hub (LocalScript)
-  COLE ESTE ARQUIVO EM StarterPlayer > StarterPlayerScripts COMO "DevHub_Local"
+ Dev Hub Warpo
+
   -------------------------------------------------------------
   BLOCO DESCONSIDERADOR (mantenha no topo para identificar "não mexer").
   Defina DESCONSIDERAR = false para que o Hub execute.
